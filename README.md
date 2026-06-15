@@ -24,18 +24,21 @@ Abaixo estao as demonstracoes das camadas de extracao, estruturacao e linhagem o
 
 ### 1. Ingestao e Triagem Cognitiva (Worker Logs)
 Demonstracao do motor de descoberta operando e do LLM atuando como classificador (descartando PDFs invalidos e aprovando relatorios operacionais reais).
+
 ![Logs de Execucao do Worker](img/logs_worker.png)
 ![Logs de Execucao do Worker](img/logs_worker_hash.png)
 
 
 ### 2. Camada de Servico e Linhagem (API / Swagger)
 Resposta estruturada do endpoint de integracao, comprovando a tipagem dos dados temporais e a exibicao transparente da fonte do dado original (Data Lineage).
+
 ![Swagger UI e Resposta JSON](img/api_swagger_req.png)
 ![Swagger UI e Resposta JSON](img/api_swagger_res.png)
 
 
 ### 3. Persistencia Relacional (Banco de Dados)
 Consulta SQL demonstrando a gravacao dos dados financeiros e as chaves estrangeiras que conectam a tabela fato ao catalogo de ingestao de forma idempotente.
+
 ![Consulta SQL de Fatos e Catalogo](img/db_query.png)
 
 ---
@@ -59,7 +62,7 @@ GEMINI_API_KEY=sua_chave_aqui
 ### 2. Deploy Local
 Execute o build dos microsservicos e inicialize a arquitetura:
 
-`docker compose up --build -d`
+`docker compose up --build`
 
 
 ### 3. Teste da API
