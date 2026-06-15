@@ -1,0 +1,53 @@
+services:
+  mysql_db:
+    image: mysql:8.0
+    container_name: pipeline_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: conjuntura_db
+      MYSQL_USER: pipeline_user
+      MYSQL_PASSWORD: pipeline_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 5
+
+  python_worker:
+    build: ./worker
+    container_name: ingestion_worker
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=pipeline_user
+      - DB_PASS=pipeline_password
+      - DB_NAME=conjuntura_db
+      - PYTHONPATH=/app/src
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  api_service:
+    build: ./api
+    container_name: conjuntura_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=pipeline_user
+      - DB_PASS=pipeline_password
+      - DB_NAME=conjuntura_db
+      - PYTHONPATH=/app/src
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
