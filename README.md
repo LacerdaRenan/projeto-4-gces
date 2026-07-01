@@ -10,8 +10,10 @@ A solucao adota uma arquitetura agnostica a layout: em vez de utilizar raspagem 
 
 ## Estrategias Arquiteturais e Requisitos
 
-1. **Gatilho de Ingestao (Polling):** Rotina orquestrada para varredura automatizada diaria sem onerar a infraestrutura das corporacoes monitoradas.
-2. **Idempotencia Absoluta (Verificacao por Hash):** O pipeline neutraliza a duplicidade calculando o **Hash SHA-256** do binario do PDF baixado. O processamento por LLM so e acionado se a assinatura criptografica do arquivo for inedita no catalogo, ignorando a volatilidade das URLs.
+1. **Gatilho de Ingestao (Polling):** Rotina orquestrada para varredura automatizada diaria via `schedule`. Um scraper baseado em Playwright extrai os links das Centrais de RI previamente mapeadas.
+2. **Idempotencia Híbrida (Rede e Catalogo):** O pipeline neutraliza o retrabalho em duas camadas:
+    - **Filtro de URL:** Evita o download fisico se a URL ja constar no banco (`catalog_repo.exists_by_url`), poupando a infraestrutura das construtoras.
+    - **Assinatura Criptografica:** Calcula o Hash SHA-256 do binário para os arquivos novos. O processamento por LLM so é acionado se a assinatura for inédita no catálogo.
 3. **Estrategia de Segmentacao (Full-Scan):** A biblioteca `pymupdf4llm` e utilizada para converter a totalidade do PDF em Markdown. O envio do texto integral aproveita a extensa janela de contexto do LLM para preservar a integridade espacial dos dados, mitigando o risco de cortes acidentais inerentes ao chunking convencional.
 4. **Contrato Semantico e Qualidade de Dados:** O modelo `HousingMetricsContract` (Pydantic) e integrado via *Structured Outputs*. O sistema instrui a IA a validar o tipo do documento (`is_valid_document`) para evitar a ingestao de informacoes fora de escopo (como editais e comunicados). A instrucao de sistema exige a extracao de dados brutos e absolutos, descartando metricas percentuais relativas voltadas ao marketing institucional.
 5. **Catalogo de Dados e Linhagem:** A arquitetura relacional associa a tabela de metricas (`fact_housing_performance`) ao registro original de captura (`catalog_ingestion`). O endpoint da API expoe diretamente a URL do documento fonte, estabelecendo a rastreabilidade ponta a ponta.
@@ -59,14 +61,20 @@ Crie um arquivo `.env` na raiz do projeto contendo as seguintes credenciais:
 
 GEMINI_API_KEY=sua_chave_aqui
 
-### 2. Deploy Local
+### 2. Ingestão Manual via Diretório (Upload Local)
+Caso queira analisar PDFs sem depender do scraper web, crie e utilize o diretório raiz `local_pdfs/`:
+1. Jogue qualquer relatório PDF dentro da pasta `local_pdfs/` (ela é mapeada como um volume no Docker).
+2. O Worker irá detectar os arquivos automaticamente no próximo ciclo, enviar para o LLM identificar a empresa, o ano e o trimestre, e persistirá as informações de forma estruturada.
+3. Arquivos processados também estão protegidos pela idempotência (não serão reenviados à IA se o hash já constar).
+
+### 3. Deploy Local
 Execute o build dos microsservicos e inicialize a arquitetura:
 
 `docker compose up --build`
 
 
-### 3. Teste da API
-Com a ingestao em andamento, acesse a documentacao OpenAPI (Swagger) localmente:
+### 4. Teste da API
+Com a ingestao em andamento (ou após processar um arquivo da pasta local), acesse a documentacao OpenAPI (Swagger):
 Link: `http://localhost:8000/docs`
 
 ## Limitacoes Encontradas e Trabalhos Futuros
@@ -75,4 +83,4 @@ Embora a arquitetura se mostre altamente resiliente a variacoes de layout, algum
 
 * **Dados Rasterizados (Imagens no PDF):** A conversao para Markdown via `pymupdf4llm` captura textos e tabelas nativas com precisao. Porem, se a construtora publicar os dados financeiros embutidos em uma imagem (grafico rasterizado), o parser atual nao conseguira extrair a informacao. Trabalhos futuros poderiam incluir a submissao dos recortes de imagem para modelos de visao computacional (VLM).
 * **Custos de Escalabilidade (Full-Scan vs Chunking):** A decisao pelo envio do texto integral (Full-Scan) garantiu maior contexto para o LLM acertar os valores, mas elevou o consumo de tokens por execucao. Em um cenario com centenas de empresas monitoradas, o custo financeiro da API escalaria rapidamente, tornando necessaria a reintroducao de um mecanismo avancado de RAG Semantico.
-* **Fragilidade da Descoberta via DOM:** O motor de *discovery* utiliza o DOM do buscador DuckDuckGo para localizar URLs oficias de RI. Se o buscador aplicar mudancas agressivas em sua árvore de elementos ou implementar proteções *anti-bot* severas contra a faixa de IP do servidor, o motor de busca exigira adaptações ou uso de APIs comerciais de *search*.
+* **Mapeamento de Domínios Fixos (Hardcoded):** A versão atual adotou um mapeamento estático das URLs de RI de cada empresa (ex: `ri.mrv.com.br`) em vez de depender de pesquisa contínua em motores de busca (DuckDuckGo/Google). Essa decisão reduziu bloqueios de *anti-bot*, mas exige manutenção manual da lista se uma empresa alterar drasticamente seu domínio de Relações com Investidores.

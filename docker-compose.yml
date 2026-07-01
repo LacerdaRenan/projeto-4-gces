@@ -29,6 +29,8 @@ services:
       - DB_PASS=pipeline_password
       - DB_NAME=conjuntura_db
       - PYTHONPATH=/app/src
+    volumes:
+      - ./local_pdfs:/app/local_pdfs
     depends_on:
       mysql_db:
         condition: service_healthy
